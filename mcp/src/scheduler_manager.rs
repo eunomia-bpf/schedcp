@@ -539,7 +539,7 @@ impl SchedulerManager {
         log::info!("Verifying custom scheduler: {}", name);
 
         // Step 3: Verify the scheduler can load and run
-        let verification_result = self.generator.execute_scheduler(name, None).await
+        let verification_result = self.generator.verify_scheduler(name, None).await
             .map_err(|e| anyhow!("Failed to verify scheduler: {}", e))?;
 
         log::info!("Successfully created and verified scheduler: {}", name);

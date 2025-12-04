@@ -883,5 +883,223 @@ Layer N 的数据流:
 
 ---
 
-*文档更新时间: 2025-11-28*
+## CPU 参与 Expert 路由的分析 (正常模式)
+
+### 核心问题
+
+**Q: 在正常模式（权重全在 GPU）下，CPU 是否参与 expert 路由？**
+
+**A: 是的。即使权重全在 GPU 上，CPU 仍然参与 expert 路由的索引计算，存在 2 次 CPU-GPU 同步点。**
+
+### 代码证据
+
+**文件位置**: `ggml/src/ggml-cuda/ggml-cuda.cu:2347-2370`
+
+```cpp
+// Step 1: GPU → CPU 传输 expert routing IDs (同步点 #1)
+std::vector<char> ids_host(ggml_nbytes(ids));
+cudaMemcpyAsync(ids_host.data(), ids->data, ggml_nbytes(ids),
+                cudaMemcpyDeviceToHost, stream);
+cudaStreamSynchronize(stream);  // ⚠️ GPU 等待传输完成
+
+// Step 2: CPU 端遍历计算 token → expert 映射
+for (int64_t i02 = 0; i02 < ne02; ++i02) {      // 每个 expert
+    for (int64_t i12 = 0; i12 < ne12; ++i12) {  // 每个 token
+        for (int64_t iex = 0; iex < n_expert_used; ++iex) {
+            const int32_t expert_to_use = *(const int32_t *)(ids_host.data() + ...);
+            if (expert_to_use == i02) {
+                tokens_per_expert[i02]++;       // 统计每个 expert 的 token 数
+                ids_from_sorted_host[...] = ids_to_sorted_host.size();
+                ids_to_sorted_host.push_back(...);
+            }
+        }
+    }
+}
+
+// Step 3: CPU → GPU 传输索引映射 (同步点 #2)
+cudaMemcpyAsync(ids_buf_dev.ptr, ids_to_sorted_host.data(),
+                2*ne_get_rows*sizeof(int32_t), cudaMemcpyHostToDevice, stream);
+cudaStreamSynchronize(stream);  // ⚠️ GPU 再次等待
+```
+
+### 数据流图 (正常模式 vs Offload 模式)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    正常模式 (权重在 GPU) - CPU 仍参与路由                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  GPU: Router MLP → Softmax → Top-K                                           │
+│              ↓                                                               │
+│       Expert IDs [n_tokens, n_expert_used]                                  │
+│              ↓                                                               │
+│  ════════════════════════════════════════════════════════════════            │
+│       cudaMemcpy DeviceToHost  (同步点 #1) ← GPU 等待                        │
+│  ════════════════════════════════════════════════════════════════            │
+│              ↓                                                               │
+│  CPU: 计算 tokens_per_expert[]                                               │
+│        计算 ids_to_sorted[] (gather 索引)                                    │
+│        计算 ids_from_sorted[] (scatter 索引)                                 │
+│              ↓                                                               │
+│  ════════════════════════════════════════════════════════════════            │
+│       cudaMemcpy HostToDevice  (同步点 #2) ← GPU 等待                        │
+│  ════════════════════════════════════════════════════════════════            │
+│              ↓                                                               │
+│  GPU: get_rows_cuda (gather 激活)                                            │
+│        for each expert:                                                      │
+│            ggml_cuda_mul_mat (GEMM) ← 权重已在 GPU，无 PCIe 传输             │
+│        get_rows_cuda (scatter 结果)                                          │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    Offload 模式 (权重在 CPU) - 额外 PCIe 传输                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  (前面步骤相同...)                                                            │
+│              ↓                                                               │
+│  GPU: get_rows_cuda (gather 激活)                                            │
+│        for each expert:                                                      │
+│            ggml_cuda_mul_mat (GEMM) ← ⚠️ 权重从 CPU 隐式传输到 GPU           │
+│        get_rows_cuda (scatter 结果)                                          │
+│                                                                              │
+│  关键区别: Offload 模式下每个 expert 的 GEMM 都需要 PCIe 传输权重            │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### CPU 计算内容
+
+| CPU 计算项 | 说明 | 复杂度 |
+|-----------|------|--------|
+| `tokens_per_expert[]` | 每个 expert 被分配了多少 token | O(n_experts × n_tokens × n_expert_used) |
+| `ids_to_sorted[]` | gather 索引，用于收集激活到连续内存 | 同上 |
+| `ids_from_sorted[]` | scatter 索引，用于分散结果到原位置 | 同上 |
+
+### 为什么 CPU 参与？
+
+| 原因 | 说明 |
+|------|------|
+| **实现简单** | CPU 上的三层循环实现简单，避免复杂的 GPU kernel |
+| **动态负载** | 每个 expert 的 token 数量动态变化，CPU 处理更灵活 |
+| **历史原因** | 早期实现未优化，后续可能迁移到 GPU |
+
+### 性能影响
+
+```
+时间线分析 (单次 MoE 层):
+
+─────────────────────────────────────────────────────────────────────────────
+GPU:  [Router计算]──[等待]──────────────────[等待]──[Gather]─[GEMM×N]─[Scatter]
+                     ↑                       ↑
+CPU:              [D2H传输][索引计算][H2D传输]
+─────────────────────────────────────────────────────────────────────────────
+                     同步点#1               同步点#2
+
+问题: GPU 在两个同步点处于空闲状态
+```
+
+**影响程度**:
+
+| 阶段 | batch size | 同步开销占比 | 影响程度 |
+|------|-----------|-------------|---------|
+| Prompt 处理 | 100-1000+ | 低 (~1-5%) | 轻微 |
+| Token 生成 | 1-8 | 高 (~10-30%) | 显著 |
+
+### 与 Offload 阈值的关系
+
+`min_batch_size = 32` 的 offload 阈值检查与 CPU 参与路由是**两个独立的问题**：
+
+| 问题 | 触发条件 | 影响 |
+|------|---------|------|
+| **CPU 参与路由** | 所有 MoE 操作 | 2 次同步点开销 |
+| **Offload 阈值** | 权重在 CPU + batch < 32 | 整个 MoE 在 CPU 执行 |
+
+```
+                           权重位置
+                    ┌────────┴────────┐
+                    GPU              CPU
+                    │                 │
+            CPU参与路由          CPU参与路由
+            (2次同步)           (2次同步)
+                    │                 │
+                    │            batch >= 32?
+                    │           ┌────┴────┐
+                    │          Yes        No
+                    │           │          │
+                GPU执行GEMM   GPU执行GEMM  CPU执行全部
+                (正常性能)    (PCIe瓶颈)   (最慢)
+```
+
+### 优化建议
+
+#### 1. GPU 侧索引计算 (已有部分实现)
+
+`mmid.cu` 中的 `mm_ids_helper` kernel 可在 GPU 上完成索引计算，但主流程未使用：
+
+```cpp
+// mmid.cu:28-116
+__global__ void mm_ids_helper(
+    const int32_t * ids,      // expert routing IDs
+    int32_t * ids_src1,       // 输出: gather 索引
+    int32_t * ids_dst,        // 输出: scatter 索引
+    int * expert_bounds,      // 输出: 每个 expert 的范围
+    ...)
+```
+
+**优化方向**: 将主流程迁移到使用 GPU 侧索引计算
+
+#### 2. 异步索引计算
+
+```cpp
+// 伪代码 - 优化方案
+cudaStream_t compute_stream, index_stream;
+
+// 当前层的 Router 计算
+router_forward(input, expert_ids, compute_stream);
+
+// 异步传输 IDs 到 CPU (不等待)
+cudaMemcpyAsync(ids_host, expert_ids, ..., DeviceToHost, index_stream);
+
+// GPU 继续其他工作...
+// ...
+
+// 需要时才同步
+cudaStreamSynchronize(index_stream);
+compute_indices_cpu(ids_host, ...);
+```
+
+#### 3. 融合 kernel
+
+将路由计算、索引生成、gather 融合为单一 kernel，避免 CPU 参与：
+
+```cpp
+// 理想的融合 kernel
+__global__ void fused_moe_route_and_gather(
+    const float * router_logits,
+    const float * activations,
+    float * gathered_activations,
+    int * expert_assignments,
+    ...)
+{
+    // 1. Top-K 选择 (当前已在 GPU)
+    // 2. 索引计算 (当前在 CPU)
+    // 3. Gather 激活 (当前已在 GPU)
+    // → 全部融合，无 CPU 参与
+}
+```
+
+### 总结
+
+| 模式 | CPU 参与路由 | GEMM 执行位置 | PCIe 传输 | 性能瓶颈 |
+|------|-------------|--------------|----------|---------|
+| 正常模式 (权重在 GPU) | ✅ 是 | GPU | 仅索引 | 同步点开销 |
+| Offload + batch≥32 | ✅ 是 | GPU | 索引 + 权重 | PCIe 带宽 |
+| Offload + batch<32 | ✅ 是 | CPU | 仅索引 | CPU 计算 |
+
+**关键发现**: 即使在"正常模式"下，MoE 实现也存在 CPU-GPU 同步瓶颈，这是独立于 offload 问题的另一个优化点。
+
+---
+
+*文档更新时间: 2025-12-03*
 *基于 llama.cpp 仓库分析*

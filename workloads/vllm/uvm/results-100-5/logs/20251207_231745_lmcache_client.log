@@ -1,0 +1,49 @@
+Command: uv run vllm bench serve --model Qwen/Qwen3-30B-A3B-FP8 --dataset-name sharegpt --num-prompts 100 --dataset-path /home/yunwei37/workspace/gpu/schedcp/workloads/vllm/datasets/ShareGPT_V3_unfiltered_cleaned_split.json --sharegpt-output-len 512 --seed 42 --request-rate 5
+Timestamp: 2025-12-07T23:28:35.743015
+============================================================
+STDOUT:
+INFO 12-07 23:28:02 [__init__.py:216] Automatically detected platform cuda.
+Namespace(subparser='bench', bench_type='serve', dispatch_function=<function BenchmarkServingSubcommand.cmd at 0x7acc6afda520>, seed=42, num_prompts=100, dataset_name='sharegpt', no_stream=False, dataset_path='/home/yunwei37/workspace/gpu/schedcp/workloads/vllm/datasets/ShareGPT_V3_unfiltered_cleaned_split.json', no_oversample=False, custom_output_len=256, custom_skip_chat_template=False, spec_bench_output_len=256, spec_bench_category=None, sonnet_input_len=550, sonnet_output_len=150, sonnet_prefix_len=200, sharegpt_output_len=512, blazedit_min_distance=0.0, blazedit_max_distance=1.0, random_input_len=1024, random_output_len=128, random_range_ratio=0.0, random_prefix_len=0, random_batch_size=1, random_mm_base_items_per_request=1, random_mm_num_mm_items_range_ratio=0.0, random_mm_limit_mm_per_prompt={'image': 255, 'video': 0}, random_mm_bucket_config={(256, 256, 1): 0.5, (720, 1280, 1): 0.5, (720, 1280, 16): 0.0}, hf_subset=None, hf_split=None, hf_name=None, hf_output_len=None, prefix_repetition_prefix_len=256, prefix_repetition_suffix_len=256, prefix_repetition_num_prefixes=10, prefix_repetition_output_len=128, label=None, backend='openai', endpoint_type=None, base_url=None, host='127.0.0.1', port=8000, endpoint='/v1/completions', header=None, max_concurrency=None, model='Qwen/Qwen3-30B-A3B-FP8', tokenizer=None, use_beam_search=False, logprobs=None, request_rate=5.0, burstiness=1.0, trust_remote_code=False, disable_tqdm=False, profile=False, save_result=False, save_detailed=False, append_result=False, metadata=None, result_dir=None, result_filename=None, ignore_eos=False, percentile_metrics='ttft,tpot,itl', metric_percentiles='99', goodput=None, request_id_prefix='benchmark-serving', top_p=None, top_k=None, min_p=None, temperature=None, tokenizer_mode='auto', served_model_name=None, lora_modules=None, ramp_up_strategy=None, ramp_up_start_rps=None, ramp_up_end_rps=None, ready_check_timeout_sec=600)
+Starting initial single prompt test run...
+Waiting for endpoint to become up in 600 seconds
+Initial test run completed. Starting main benchmark run...
+Traffic request rate: 5.0
+Burstiness factor: 1.0 (Poisson process)
+Maximum request concurrency: None
+tip: install termplotlib and gnuplot to plot the metrics
+============ Serving Benchmark Result ============
+Successful requests:                     57        
+Request rate configured (RPS):           5.00      
+Benchmark duration (s):                  20.00     
+Total input tokens:                      15898     
+Total generated tokens:                  2987      
+Request throughput (req/s):              2.85      
+Output token throughput (tok/s):         149.34    
+Peak output token throughput (tok/s):    485.00    
+Peak concurrent requests:                57.00     
+Total Token throughput (tok/s):          944.16    
+---------------Time to First Token----------------
+Mean TTFT (ms):                          383.21    
+Median TTFT (ms):                        341.76    
+P99 TTFT (ms):                           971.43    
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          129.56    
+Median TPOT (ms):                        130.81    
+P99 TPOT (ms):                           148.28    
+---------------Inter-token Latency----------------
+Mean ITL (ms):                           128.37    
+Median ITL (ms):                         101.09    
+P99 ITL (ms):                            484.33    
+==================================================
+
+============================================================
+STDERR:
+
+ |          | 00:00 elapsed, ? remaining
+ |          | 00:00 elapsed, 00:01 remaining
+ |          | 00:09 elapsed, 658:24:46 remaining
+
+  0%|          | 0/100 [00:00<?, ?it/s]
+  1%|          | 1/100 [00:12<21:09, 12.82s/it]
+ 63%|██████▎   | 63/100 [00:12<00:05,  6.90it/s]
+100%|██████████| 100/100 [00:20<00:00,  5.00it/s]

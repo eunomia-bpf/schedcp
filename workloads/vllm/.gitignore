@@ -1,6 +1,5 @@
 # Datasets
 datasets/
-*.json
 *.csv
 *.txt
 !benchmarks/sonnet.txt
@@ -28,8 +27,6 @@ vllm_env/
 *.swo
 
 # Logs
-*.log
-logs/
 results/
 
 # Cache

@@ -23,7 +23,7 @@ We evaluate five memory management strategies for running a 120B parameter Mixtu
 
 ### Key Observations
 
-1. **eBPF-based prefetching achieves 11.3x decode speedup**: The UVM + eBPF configuration delivers the best decode throughput (86.89 t/s) while maintaining competitive prefill performance (229.67 t/s). This demonstrates that kernel-level prefetching can effectively hide memory transfer latency during autoregressive decoding.
+1. **eBPF-based prefetching achieves 11.3x decode speedup**: The UVM + eBPF configuration delivers the best decode throughput (86.89 t/s) while maintaining competitive prefill performance (229.67 t/s). Compared to CPU offload approaches, eBPF prefetching achieves **4.8x faster decode than ncmoe=32** (86.89 vs 18.18 t/s) and **5.3x faster than ncmoe=64** (86.89 vs 16.34 t/s). This demonstrates that kernel-level prefetching can effectively hide memory transfer latency during autoregressive decoding.
 
 2. **CPU offload (ncmoe) optimizes prefill at decode cost**: The ncmoe=32 configuration achieves the highest prefill throughput (260.14 t/s, +9.1% over baseline) by explicitly offloading MoE experts to CPU. However, decode performance is limited (18.18 t/s) due to the overhead of CPU-GPU data transfers for each token.
 

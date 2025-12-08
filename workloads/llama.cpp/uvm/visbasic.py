@@ -39,7 +39,6 @@ rects2 = ax2.bar(
 )
 ax2.set_ylabel("tokens/s (tg128)")
 
-fig.suptitle("gpt-oss-120B MXFP4 MoE - throughput vs config")
 
 handles = [rects1, rects2]
 labels = ["pp512 tokens/s", "tg128 tokens/s"]

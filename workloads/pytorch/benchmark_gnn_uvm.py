@@ -393,7 +393,7 @@ def evaluate(model, data, y, masks, args):
 # Memory Tracking
 # =============================================================================
 
-def get_memory_stats(uvm_lib=None):
+def get_memory_stats(uvm_lib=None, gpu_lib=None):
     """Get comprehensive memory statistics"""
     cpu_used = psutil.Process().memory_info().rss / 1e9
 
@@ -401,6 +401,16 @@ def get_memory_stats(uvm_lib=None):
         # UVM allocator statistics
         gpu_allocated = uvm_lib.uvm_get_allocated_bytes() / 1e9
         gpu_peak = uvm_lib.uvm_get_peak_allocated_bytes() / 1e9
+        return {
+            'gpu_allocated': gpu_allocated,
+            'gpu_reserved': gpu_peak,
+            'cpu_used': cpu_used,
+            'total': gpu_allocated + cpu_used
+        }
+    elif gpu_lib is not None:
+        # Custom GPU allocator statistics
+        gpu_allocated = gpu_lib.gpu_get_allocated_bytes() / 1e9
+        gpu_peak = gpu_lib.gpu_get_peak_allocated_bytes() / 1e9
         return {
             'gpu_allocated': gpu_allocated,
             'gpu_reserved': gpu_peak,
@@ -454,6 +464,41 @@ def enable_uvm_allocator():
     return uvm_lib
 
 
+def enable_gpu_allocator():
+    """Enable custom GPU allocator (NOT UVM) for comparison testing"""
+    so_path = os.path.join(os.path.dirname(__file__), 'gpu_allocator.so')
+
+    if not os.path.exists(so_path):
+        raise FileNotFoundError(
+            f"GPU allocator not found at {so_path}\n"
+            f"Please build it first with: make -C pytorch/"
+        )
+
+    # Load library for statistics
+    gpu_lib = ctypes.CDLL(so_path)
+
+    # Define function signatures
+    gpu_lib.gpu_get_allocated_bytes.restype = ctypes.c_size_t
+    gpu_lib.gpu_get_allocated_bytes.argtypes = []
+
+    gpu_lib.gpu_get_peak_allocated_bytes.restype = ctypes.c_size_t
+    gpu_lib.gpu_get_peak_allocated_bytes.argtypes = []
+
+    gpu_lib.gpu_get_num_allocs.restype = ctypes.c_size_t
+    gpu_lib.gpu_get_num_allocs.argtypes = []
+
+    gpu_lib.gpu_get_num_frees.restype = ctypes.c_size_t
+    gpu_lib.gpu_get_num_frees.argtypes = []
+
+    # Enable in PyTorch
+    allocator = torch.cuda.memory.CUDAPluggableAllocator(
+        so_path, 'gpu_malloc', 'gpu_free'
+    )
+    torch.cuda.memory.change_current_allocator(allocator)
+
+    return gpu_lib
+
+
 # =============================================================================
 # Main Benchmark
 # =============================================================================
@@ -496,24 +541,38 @@ def main():
     parser.add_argument('--seed', type=int, default=2025,
                         help='Random seed for reproducibility (default: 2025)')
 
-    # UVM and output
+    # Allocator and output
     parser.add_argument('--use_uvm', action='store_true',
-                        help='Enable UVM allocator')
+                        help='Enable UVM allocator (cudaMallocManaged)')
+    parser.add_argument('--use_gpu_allocator', action='store_true',
+                        help='Enable custom GPU allocator (cudaMalloc, for comparison)')
     parser.add_argument('--report_json', type=str, default='',
                         help='Path to save JSON report')
 
     args = parser.parse_args()
 
     # =============================================================================
-    # Step 0: Enable UVM (must be before any CUDA operations)
+    # Step 0: Enable custom allocator (must be before any CUDA operations)
     # =============================================================================
     uvm_lib = None
+    gpu_lib = None
+
+    if args.use_uvm and args.use_gpu_allocator:
+        print("ERROR: Cannot use both --use_uvm and --use_gpu_allocator")
+        return
+
     if args.use_uvm:
         print("=" * 70)
-        print("Enabling UVM Allocator")
+        print("Enabling UVM Allocator (cudaMallocManaged)")
         print("=" * 70)
         uvm_lib = enable_uvm_allocator()
         print("[UVM] Allocator enabled\n")
+    elif args.use_gpu_allocator:
+        print("=" * 70)
+        print("Enabling Custom GPU Allocator (cudaMalloc)")
+        print("=" * 70)
+        gpu_lib = enable_gpu_allocator()
+        print("[GPU] Custom allocator enabled\n")
 
     # =============================================================================
     # Step 1: Setup for Reproducibility
@@ -546,7 +605,7 @@ def main():
     num_features = x.size(1)
     num_classes = int(y.max().item()) + 1 if args.dataset != 'random' else args.num_classes
 
-    mem = get_memory_stats(uvm_lib)
+    mem = get_memory_stats(uvm_lib, gpu_lib)
     print(f"  Memory: GPU={mem['gpu_allocated']:.2f}GB, CPU={mem['cpu_used']:.2f}GB")
 
     # =============================================================================
@@ -558,7 +617,7 @@ def main():
     )
     print(f"  Normalized edges: {src.size(0):,} (with self-loops and symmetrization)")
 
-    mem = get_memory_stats(uvm_lib)
+    mem = get_memory_stats(uvm_lib, gpu_lib)
     print(f"  Memory: GPU={mem['gpu_allocated']:.2f}GB, CPU={mem['cpu_used']:.2f}GB")
 
     # =============================================================================
@@ -581,7 +640,7 @@ def main():
     num_params = sum(p.numel() for p in model.parameters())
     print(f"  Parameters: {num_params:,}")
 
-    mem = get_memory_stats(uvm_lib)
+    mem = get_memory_stats(uvm_lib, gpu_lib)
     print(f"  Memory: GPU={mem['gpu_allocated']:.2f}GB, CPU={mem['cpu_used']:.2f}GB")
 
     # =============================================================================
@@ -604,7 +663,7 @@ def main():
         epoch_times.append(dt)
 
         if ep == 0 or ep == args.epochs - 1:
-            mem = get_memory_stats(uvm_lib)
+            mem = get_memory_stats(uvm_lib, gpu_lib)
             print(f"    Epoch {ep+1}/{args.epochs}: loss={loss:.4f}, time={dt:.3f}s | "
                   f"GPU={mem['gpu_allocated']:.2f}GB, CPU={mem['cpu_used']:.2f}GB")
         else:
@@ -635,7 +694,7 @@ def main():
     avg_time = sum(epoch_times) / len(epoch_times)
     median_time = sorted(epoch_times)[len(epoch_times) // 2]
 
-    final_mem = get_memory_stats(uvm_lib)
+    final_mem = get_memory_stats(uvm_lib, gpu_lib)
 
     print("\n" + "=" * 70)
     print("Results Summary")

@@ -1,0 +1,32 @@
+{
+  "dataset": "random",
+  "propagation": "chunked",
+  "epochs": 2,
+  "warmup": 1,
+  "hidden_dim": 256,
+  "chunk_size": 2000000,
+  "num_nodes": 5000000,
+  "num_features": 128,
+  "num_classes": 10,
+  "num_edges": 105000000,
+  "avg_epoch_time_s": 1.8921409845352173,
+  "median_epoch_time_s": 1.9038846492767334,
+  "total_time_s": 3.7842819690704346,
+  "epoch_times_s": [
+    1.8803973197937012,
+    1.9038846492767334
+  ],
+  "accuracy": {
+    "train": 0.100542
+  },
+  "memory": {
+    "gpu_allocated_GB": 5.52365744,
+    "cpu_used_GB": 1.613611008,
+    "total_GB": 7.137268448
+  },
+  "use_uvm": false,
+  "seed": 2025,
+  "gpu_name": "NVIDIA GeForce RTX 5090",
+  "gpu_memory_GB": 33.669316608,
+  "timestamp": "2025-12-08T14:39:43.411232"
+}

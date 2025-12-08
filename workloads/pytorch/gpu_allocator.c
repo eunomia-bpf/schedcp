@@ -1,8 +1,8 @@
 /*
- * CUDA UVM Allocator for PyTorch with Memory Statistics
+ * CUDA GPU Allocator for PyTorch with Memory Statistics (No UVM)
  *
- * This is a custom CUDA allocator that uses cudaMallocManaged
- * to enable Unified Virtual Memory (UVM) in PyTorch.
+ * This is a custom CUDA allocator that uses standard cudaMalloc
+ * (NOT cudaMallocManaged) for comparison with UVM allocator.
  */
 
 #include <cuda_runtime.h>
@@ -15,16 +15,16 @@ static atomic_size_t peak_allocated = 0;
 static atomic_size_t num_allocs = 0;
 static atomic_size_t num_frees = 0;
 
-// Allocate CUDA managed memory
-void* uvm_malloc(ssize_t size, int device, cudaStream_t stream) {
+// Allocate standard CUDA device memory (NOT UVM)
+void* gpu_malloc(ssize_t size, int device, cudaStream_t stream) {
     void* ptr = NULL;
     cudaError_t err;
 
-    // Use cudaMallocManaged for UVM
-    err = cudaMallocManaged(&ptr, size, cudaMemAttachGlobal);
+    // Use standard cudaMalloc (NOT cudaMallocManaged)
+    err = cudaMalloc(&ptr, size);
 
     if (err != cudaSuccess) {
-        fprintf(stderr, "[UVM] cudaMallocManaged failed: %s\n",
+        fprintf(stderr, "[GPU] cudaMalloc failed: %s\n",
                 cudaGetErrorString(err));
         return NULL;
     }
@@ -43,20 +43,15 @@ void* uvm_malloc(ssize_t size, int device, cudaStream_t stream) {
 
     // Log large allocations
     if (size > 1000 * 1024 * 1024) { // > 1GB
-        fprintf(stderr, "[UVM] Alloc #%zu: %.2f GB (total: %.2f GB, peak: %.2f GB)\n",
+        fprintf(stderr, "[GPU] Alloc #%zu: %.2f GB (total: %.2f GB, peak: %.2f GB)\n",
                 alloc_count, size / 1e9, current / 1e9, atomic_load(&peak_allocated) / 1e9);
-    }
-
-    // Prefetch to the specified device to avoid page faults
-    if (device >= 0 && ptr != NULL) {
-        cudaMemPrefetchAsync(ptr, size, device, stream);
     }
 
     return ptr;
 }
 
-// Free CUDA managed memory
-void uvm_free(void* ptr, size_t size, int device, cudaStream_t stream) {
+// Free CUDA device memory
+void gpu_free(void* ptr, size_t size, int device, cudaStream_t stream) {
     if (ptr != NULL) {
         cudaFree(ptr);
 
@@ -67,26 +62,26 @@ void uvm_free(void* ptr, size_t size, int device, cudaStream_t stream) {
 }
 
 // Get current allocated bytes
-size_t uvm_get_allocated_bytes(void) {
+size_t gpu_get_allocated_bytes(void) {
     return atomic_load(&total_allocated);
 }
 
 // Get peak allocated bytes
-size_t uvm_get_peak_allocated_bytes(void) {
+size_t gpu_get_peak_allocated_bytes(void) {
     return atomic_load(&peak_allocated);
 }
 
 // Get allocation count
-size_t uvm_get_num_allocs(void) {
+size_t gpu_get_num_allocs(void) {
     return atomic_load(&num_allocs);
 }
 
 // Get free count
-size_t uvm_get_num_frees(void) {
+size_t gpu_get_num_frees(void) {
     return atomic_load(&num_frees);
 }
 
 // Reset peak statistics
-void uvm_reset_peak_stats(void) {
+void gpu_reset_peak_stats(void) {
     atomic_store(&peak_allocated, atomic_load(&total_allocated));
 }

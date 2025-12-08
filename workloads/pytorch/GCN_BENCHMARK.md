@@ -264,3 +264,69 @@ Epoch Time (s)
 - cuBLAS 可能在极端 oversubscription (>2×) 时失败
 - 建议每个配置运行 3 次取平均值
 - 监控 `nvidia-smi` 观察实时 GPU 内存和 PCIe 带宽
+
+---
+
+## Allocator Overhead Analysis
+
+### Three Allocators Comparison
+
+| Allocator | Command | Description |
+|-----------|---------|-------------|
+| PyTorch Default | (none) | Built-in caching allocator |
+| Custom GPU | `--use_gpu_allocator` | cudaMalloc (no caching) |
+| UVM | `--use_uvm` | cudaMallocManaged |
+
+### Test Script: Allocator Comparison
+
+```bash
+#!/bin/bash
+# run_allocator_comparison.sh - 对比三种 allocator 的性能
+
+RESULT_DIR="result_allocator_compare"
+mkdir -p $RESULT_DIR
+
+NODES=5000000
+
+echo "=== Test 1: PyTorch Default Allocator ==="
+uv run python benchmark_gnn_uvm.py --dataset random --nodes $NODES \
+    --edges_per_node 10 --features 128 --hidden 256 \
+    --epochs 2 --warmup 1 --prop chunked \
+    --report_json $RESULT_DIR/pytorch_default.json
+
+echo "=== Test 2: Custom GPU Allocator (cudaMalloc) ==="
+uv run python benchmark_gnn_uvm.py --dataset random --nodes $NODES \
+    --edges_per_node 10 --features 128 --hidden 256 \
+    --epochs 2 --warmup 1 --prop chunked --use_gpu_allocator \
+    --report_json $RESULT_DIR/custom_gpu.json
+
+echo "=== Test 3: UVM Allocator (cudaMallocManaged) ==="
+CUDA_MANAGED_FORCE_DEVICE_ALLOC=1 uv run python benchmark_gnn_uvm.py \
+    --dataset random --nodes $NODES \
+    --edges_per_node 10 --features 128 --hidden 256 \
+    --epochs 2 --warmup 1 --prop chunked --use_uvm \
+    --report_json $RESULT_DIR/uvm.json
+
+echo "=== Done ==="
+```
+
+### Results (5M nodes, no oversubscription)
+
+| Allocator | Epoch Time | Relative | Source of Overhead |
+|-----------|------------|----------|-------------------|
+| PyTorch Default | **1.14s** | 1× | Baseline (caching allocator) |
+| Custom GPU | **1.89s** | 1.66× | No memory pooling |
+| UVM (no prefetch) | **34.23s** | **30×** | Lazy page migration |
+| UVM (with prefetch) | **5.57s** | **4.9×** | Eager prefetch to GPU |
+
+### Key Findings
+
+1. **Custom allocator overhead**: ~66% slower than PyTorch default (no caching)
+2. **Prefetch is critical**: Enabling `cudaMemPrefetchAsync` reduces UVM overhead from **30×** to **5×**
+3. **UVM overhead breakdown (with prefetch)**:
+   - ~1.7× from custom allocator (no memory pooling)
+   - ~3× from prefetch synchronization and UVM page table management
+4. **UVM overhead breakdown (without prefetch)**:
+   - ~1.7× from custom allocator (no pooling)
+   - **~18×** from lazy page fault handling on first access
+5. **Lesson**: Always use `cudaMemPrefetchAsync` when data fits in GPU memory to avoid page fault overhead

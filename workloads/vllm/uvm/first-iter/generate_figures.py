@@ -363,8 +363,77 @@ def plot_ttft_tpot_combined():
     print("Generated: ttft_tpot_combined.png")
 
 
+def print_data_comparison():
+    """Print data comparison table for TTFT and TPOT metrics."""
+    configs = data["configurations"]
+
+    print("\n" + "="*80)
+    print("TTFT (Time to First Token) Comparison (ms)")
+    print("="*80)
+    print(f"{'Configuration':<20} {'Mean':>12} {'Median':>12} {'P99':>12}")
+    print("-"*56)
+    for i, cfg in enumerate(configs):
+        cfg_name = cfg.replace('\n', ' ')
+        print(f"{cfg_name:<20} {data['ttft_mean'][i]:>12.2f} {data['ttft_median'][i]:>12.2f} {data['ttft_p99'][i]:>12.2f}")
+
+    # Calculate improvements vs UVM Baseline (index 1)
+    print("\nImprovement vs UVM Baseline (lower is better):")
+    baseline_idx = 1
+    for i, cfg in enumerate(configs):
+        if i == baseline_idx:
+            continue
+        cfg_name = cfg.replace('\n', ' ')
+        mean_imp = (data['ttft_mean'][baseline_idx] - data['ttft_mean'][i]) / data['ttft_mean'][baseline_idx] * 100
+        median_imp = (data['ttft_median'][baseline_idx] - data['ttft_median'][i]) / data['ttft_median'][baseline_idx] * 100
+        p99_imp = (data['ttft_p99'][baseline_idx] - data['ttft_p99'][i]) / data['ttft_p99'][baseline_idx] * 100
+        print(f"  {cfg_name:<18}: Mean {mean_imp:+.1f}%, Median {median_imp:+.1f}%, P99 {p99_imp:+.1f}%")
+
+    print("\n" + "="*80)
+    print("TPOT (Time per Output Token) Comparison (ms)")
+    print("="*80)
+    print(f"{'Configuration':<20} {'Mean':>12} {'Median':>12} {'P99':>12}")
+    print("-"*56)
+    for i, cfg in enumerate(configs):
+        cfg_name = cfg.replace('\n', ' ')
+        print(f"{cfg_name:<20} {data['tpot_mean'][i]:>12.2f} {data['tpot_median'][i]:>12.2f} {data['tpot_p99'][i]:>12.2f}")
+
+    # Calculate improvements vs UVM Baseline
+    print("\nImprovement vs UVM Baseline (lower is better):")
+    for i, cfg in enumerate(configs):
+        if i == baseline_idx:
+            continue
+        cfg_name = cfg.replace('\n', ' ')
+        mean_imp = (data['tpot_mean'][baseline_idx] - data['tpot_mean'][i]) / data['tpot_mean'][baseline_idx] * 100
+        median_imp = (data['tpot_median'][baseline_idx] - data['tpot_median'][i]) / data['tpot_median'][baseline_idx] * 100
+        p99_imp = (data['tpot_p99'][baseline_idx] - data['tpot_p99'][i]) / data['tpot_p99'][baseline_idx] * 100
+        print(f"  {cfg_name:<18}: Mean {mean_imp:+.1f}%, Median {median_imp:+.1f}%, P99 {p99_imp:+.1f}%")
+
+    print("\n" + "="*80)
+    print("Throughput Comparison (tok/s)")
+    print("="*80)
+    print(f"{'Configuration':<20} {'Output':>12} {'Total':>12} {'Duration(s)':>12}")
+    print("-"*56)
+    for i, cfg in enumerate(configs):
+        cfg_name = cfg.replace('\n', ' ')
+        print(f"{cfg_name:<20} {data['output_throughput'][i]:>12.2f} {data['total_throughput'][i]:>12.2f} {data['benchmark_duration'][i]:>12.2f}")
+
+    # Calculate improvements vs UVM Baseline (higher is better for throughput)
+    print("\nImprovement vs UVM Baseline (higher is better):")
+    for i, cfg in enumerate(configs):
+        if i == baseline_idx:
+            continue
+        cfg_name = cfg.replace('\n', ' ')
+        out_imp = (data['output_throughput'][i] - data['output_throughput'][baseline_idx]) / data['output_throughput'][baseline_idx] * 100
+        total_imp = (data['total_throughput'][i] - data['total_throughput'][baseline_idx]) / data['total_throughput'][baseline_idx] * 100
+        dur_imp = (data['benchmark_duration'][baseline_idx] - data['benchmark_duration'][i]) / data['benchmark_duration'][baseline_idx] * 100
+        print(f"  {cfg_name:<18}: Output {out_imp:+.1f}%, Total {total_imp:+.1f}%, Duration {dur_imp:+.1f}%")
+
+    print("="*80 + "\n")
+
+
 if __name__ == "__main__":
     print(f"Output directory: {output_dir}")
+    print_data_comparison()
     print("Generating figures...")
 
     plot_ttft_comparison()

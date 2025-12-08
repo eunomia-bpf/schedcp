@@ -196,6 +196,75 @@ P99 TPOT (ms):                           817.94
 ---------------Inter-token Latency----------------
 Mean ITL (ms):                           131.20    
 Median ITL (ms):                         122.30    
-P99 ITL (ms):                            833.54    
+P99 ITL (ms):                            833.54
 ==================================================
+```
+
+## 自动化测试脚本
+
+使用 `test_uvm_baselines.py` 可以自动运行所有 baseline 测试。
+
+### 运行所有 baseline 测试（默认参数）
+
+```bash
+cd ~/workspace/gpu/schedcp/workloads/vllm
+python uvm/test_uvm_baselines.py
+```
+
+### 自定义 benchmark 参数
+
+通过 `--bench-args` 传递参数给 `vllm bench serve`：
+
+```bash
+# 减少 prompts 数量
+python uvm/test_uvm_baselines.py --bench-args "--model Qwen/Qwen3-30B-A3B-FP8 --dataset-name sharegpt --num-prompts 50 --dataset-path /home/yunwei37/workspace/gpu/schedcp/workloads/vllm/datasets/ShareGPT_V3_unfiltered_cleaned_split.json"
+
+# 限制请求速率
+python uvm/test_uvm_baselines.py --bench-args "--model Qwen/Qwen3-30B-A3B-FP8 --dataset-name sharegpt --num-prompts 10 --request-rate 10 --dataset-path /home/yunwei37/workspace/gpu/schedcp/workloads/vllm/datasets/ShareGPT_V3_unfiltered_cleaned_split.json"
+```
+
+### 只运行特定 baseline
+
+```bash
+# 只测试 CPU offload 和 UVM baseline
+python uvm/test_uvm_baselines.py --baselines cpu_offload uvm_baseline
+
+# 只测试 LMCache
+python uvm/test_uvm_baselines.py --baselines lmcache
+```
+
+### 可用的 baseline 选项
+
+| 选项 | 说明 | Server 目录 |
+|------|------|-------------|
+| `cpu_offload` | CPU Offload (8GB) | `~/workspace/vllm` |
+| `uvm_baseline` | UVM Baseline | `~/workspace/vllm` |
+| `lmcache` | LMCache KV cache offloading | `/home/yunwei37/workspace/gpu/LMCache` |
+
+### 输出结果
+
+结果保存在 `results/` 目录下：
+- `uvm_baseline_results_<timestamp>.json` - 带时间戳的结果文件
+- `uvm_baseline_results_latest.json` - 指向最新结果的软链接
+
+日志保存在 `results/logs/` 目录下：
+- `<timestamp>_<baseline>_server.log` - Server 日志
+- `<timestamp>_<baseline>_client.log` - Client (benchmark) 日志
+
+### 完整参数列表
+
+```bash
+python uvm/test_uvm_baselines.py --help
+```
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--bench-args` | 见下方 | 传递给 vllm bench serve 的参数 |
+| `--baselines` | 全部 | 指定要测试的 baseline |
+| `--output-dir` | results | 输出目录 |
+| `--server-timeout` | 600 | Server 启动超时时间 (秒) |
+
+默认 `--bench-args`:
+```
+--model Qwen/Qwen3-30B-A3B-FP8 --dataset-name sharegpt --num-prompts 100 --dataset-path /home/yunwei37/workspace/gpu/schedcp/workloads/vllm/datasets/ShareGPT_V3_unfiltered_cleaned_split.json
 ```

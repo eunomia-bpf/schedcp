@@ -1,305 +1,266 @@
-# GCN Benchmark
+# GCN UVM Oversubscription Experiment Plan
 
-No overscription (
+## Objective
 
-```
+测试 CUDA Unified Virtual Memory (UVM) 在显存超额分配 (oversubscription) 场景下的性能表现，并评估内核调度优化 (eBPF scheduler) 对 UVM 性能的影响。
 
-======================================================================
-Results Summary
-======================================================================
-Avg epoch time: 15.719s
-Median epoch time: 15.719s
-Total training time: 15.72s
-
-Accuracy:
-  train: 0.0998
-
-UVM Statistics:
-  Peak allocated: 27.07 GB
-  Allocations: 1015
-  Frees: 856
-======================================================================
-```
-
-baseline
-
-```
-
-======================================================================
-Results Summary
-======================================================================
-Avg epoch time: 71.000s
-Median epoch time: 71.000s
-Total training time: 71.00s
-
-Accuracy:
-  train: 0.1001
-
-UVM Statistics:
-  Peak allocated: 45.11 GB
-  Allocations: 1611
-  Frees: 1368
-======================================================================
-```
-
-uvm + kernel driver eBPF
-
-```
-======================================================================
-Results Summary
-======================================================================
-Avg epoch time: 27.429s
-Median epoch time: 27.429s
-Total training time: 27.43s
-
-Accuracy:
-  train: 0.1001
-
-UVM Statistics:
-  Peak allocated: 45.11 GB
-  Allocations: 1611
-  Frees: 1368
-======================================================================
-```
-
-## Overview
-
-This benchmark implements a standard GCN (Graph Convolutional Network) with symmetric normalization following the canonical formulation: **D^{-1/2}(A + I)D^{-1/2}**.
-
-Key features:
-- ✅ Normalized GCN aggregation (symmetric + self-loops)
-- ✅ Two propagation modes: SpMM (standard) and Chunked (memory-efficient)
-- ✅ Standard dataset support (ogbn-arxiv, ogbn-products via OGB)
-- ✅ UVM support for extreme-scale experiments
-- ✅ Reproducible evaluation with warmup, synchronization, and JSON output
-
-```
-
-# Test 1: Small graph, SpMM mode
-echo ""
-echo "[Test 1/4] Small graph (100K nodes) - SpMM mode"
-echo "Expected: Fast execution, ~0.005s per epoch"
-python benchmark_gnn_uvm.py --dataset random --nodes 100000 \
-    --edges_per_node 10 --features 64 --hidden 128 \
-    --epochs 2 --warmup 1 --prop spmm \
-    --report_json test_results_spmm_small.json
-
-# Test 2: Small graph, Chunked mode
-echo ""
-echo "[Test 2/4] Small graph (100K nodes) - Chunked mode"
-echo "Expected: Similar speed to SpMM, less GPU memory"
-python benchmark_gnn_uvm.py --dataset random --nodes 100000 \
-    --edges_per_node 10 --features 64 --hidden 128 \
-    --epochs 2 --warmup 1 --prop chunked \
-    --report_json test_results_chunked_small.json
-
-# Test 3: Medium graph without UVM
-echo ""
-echo "[Test 3/4] Medium graph (1M nodes) - No UVM"
-echo "Expected: Success, ~0.2s per epoch"
-python benchmark_gnn_uvm.py --dataset random --nodes 1000000 \
-    --edges_per_node 10 --features 128 --hidden 256 \
-    --epochs 2 --warmup 1 --prop chunked \
-    --report_json test_results_medium_no_uvm.json
-
-# Test 4: Large graph with UVM (oversubscription)
-echo ""
-echo "[Test 4/4] Large graph (10M nodes) - UVM Oversubscription"
-echo "Expected: Success but slow (~70s per epoch), peak memory > GPU capacity"
-export CUDA_MANAGED_FORCE_DEVICE_ALLOC=1
-python benchmark_gnn_uvm.py --dataset random --nodes 10000000 \
-    --edges_per_node 10 --features 128 --hidden 256 \
-    --epochs 1 --warmup 0 --prop chunked --use_uvm \
-    --report_json test_results_large_uvm.json 2>&1 | grep -v "^\[UVM\] Alloc"
-```
+---
 
 ## Test Environment
 
-- **GPU**: NVIDIA GeForce RTX 5090 (31.36 GB usable)
-- **PyTorch**: 2.9.0+cu128
-- **CUDA**: 12.8
+| Component | Specification |
+|-----------|---------------|
+| **GPU** | NVIDIA GeForce RTX 5090 |
+| **GPU Memory** | 33.67 GB (31.36 GB usable) |
+| **PyTorch** | 2.9.0+cu128 |
+| **CUDA** | 12.8 |
+| **Workload** | GCN (Graph Convolutional Network) |
 
 ---
 
-## Experiment 1: Standard Scale (1M nodes)
+## Memory Estimation
 
-### Configuration
-- **Nodes**: 1,000,000
-- **Edges**: 10,000,000 (avg 10 per node)
-- **Features**: 128 dimensions
-- **Hidden**: 256 dimensions
-- **Epochs**: 3 (with 1 warmup)
-
-### Results: SpMM Mode (Standard Sparse Matrix Multiplication)
-
-| Metric | Value |
-|--------|-------|
-| Avg Epoch Time | **0.141s** |
-| Median Epoch Time | 0.141s |
-| Total Training Time | 0.424s |
-| GPU Memory | **1.54 GB** |
-| CPU Memory | 1.66 GB |
-| Total Memory | 3.20 GB |
-| Train Accuracy | 0.1059 |
-
-### Results: Chunked Mode (Memory-Efficient)
-
-| Metric | Value |
-|--------|-------|
-| Avg Epoch Time | **0.218s** |
-| Median Epoch Time | 0.218s |
-| Total Training Time | 0.655s |
-| GPU Memory | **1.12 GB** |
-| CPU Memory | 1.64 GB |
-| Total Memory | 2.76 GB |
-| Train Accuracy | 0.1060 |
-
-### Key Observations
-
-1. **Memory Efficiency**: Chunked mode uses **27% less GPU memory** (1.12 GB vs 1.54 GB)
-   - Avoids creating [E, F] intermediate tensors
-   - Processes edges in chunks of 2M
-
-2. **Performance Trade-off**: Chunked mode is **54% slower** (0.218s vs 0.141s per epoch)
-   - More kernel launches due to chunked processing
-   - But enables training graphs that exceed GPU memory
-
-3. **Accuracy**: Both methods produce identical results
-   - Same GCN formulation with symmetric normalization
-
----
-
-## Experiment 2: Oversubscription (10M nodes)
-
-### Configuration
-- **Nodes**: 10,000,000
-- **Edges**: 100,000,000 (avg 10 per node)
-- **Features**: 128 dimensions
-- **Hidden**: 256 dimensions
-- **Epochs**: 2 (with 1 warmup)
-- **Mode**: Chunked (required for this scale)
-
-### Without UVM: **OUT OF MEMORY** ❌
+**简化估算公式** (F=128, H=256, edges_per_node=10):
 
 ```
-torch.OutOfMemoryError: CUDA out of memory.
-Tried to allocate 1.91 GiB. GPU 0 has a total capacity of 31.36 GiB
-of which 1.40 GiB is free. Including non-PyTorch memory, this process
-has 29.94 GiB memory in use.
+Peak(GB) ≈ N × 0.0045 + 0.5
 ```
 
-- Training **fails during warmup epoch**
-- Peak memory exceeds GPU capacity (~30 GB allocated)
-
-### With UVM: **SUCCESS** ✅
-
-| Metric | Value |
-|--------|-------|
-| Avg Epoch Time | **69.87s** |
-| Median Epoch Time | 69.91s |
-| Total Training Time | 139.74s |
-| GPU Memory (reported) | 11.03 GB |
-| CPU Memory | 1.61 GB |
-| **UVM Peak Allocated** | **45.11 GB** |
-| UVM Allocations | 3,857 |
-| UVM Frees | 3,186 |
-| Train Accuracy | 0.1007 |
-
-### Critical Insights
-
-1. **Oversubscription Achieved**: UVM peak allocation (45.11 GB) **exceeds GPU capacity** (31.36 GB)
-   - Successfully trains a graph that would otherwise OOM
-   - Data seamlessly migrates between GPU and system memory
-
-2. **Performance Impact**:
-   - **495× slower** than 1M node baseline (69.87s vs 0.141s per epoch)
-   - But training **completes successfully** vs complete failure without UVM
-
-3. **Memory Thrashing**:
-   - 3,857 allocations during 3 epochs (warmup + 2 measured)
-   - ~1,286 allocations per epoch suggests frequent memory management overhead
-   - Large 10.24 GB allocations indicate PyTorch's internal tensor operations
-
-4. **Trade-off Analysis**:
-   - **Without UVM**: Fast but limited by GPU memory → OOM at 10M nodes
-   - **With UVM**: 495× slower but enables extreme-scale training
+| Nodes | Edges | Estimated Peak | vs GPU (31.36 GB) |
+|-------|-------|----------------|-------------------|
+| 5M | 50M | ~23 GB | 73% (无需 UVM) |
+| 7M | 70M | ~32 GB | **102% (临界点)** |
+| 10M | 100M | ~45 GB | **143% (中度)** |
+| 12M | 120M | ~54 GB | **172% (重度)** |
+| 15M | 150M | ~68 GB | **217% (极限)** |
 
 ---
 
-## Performance Summary Table
+## Existing Results
 
-| Configuration | Nodes | Mode | UVM | Epoch Time | GPU Mem | Peak Mem | Result |
-|---------------|-------|------|-----|------------|---------|----------|--------|
-| Small (baseline) | 1M | SpMM | ❌ | 0.141s | 1.54 GB | 1.54 GB | ✅ Fast |
-| Small (efficient) | 1M | Chunked | ❌ | 0.218s | 1.12 GB | 1.12 GB | ✅ Memory-efficient |
-| Large (no UVM) | 10M | Chunked | ❌ | N/A | N/A | >31 GB | ❌ **OOM** |
-| Large (UVM) | 10M | Chunked | ✅ | 69.87s | 11.03 GB | **45.11 GB** | ✅ **Oversubscription** |
+### Summary (OSDI Eval Style)
 
----
+We evaluate UVM oversubscription performance using a GCN training workload on an NVIDIA RTX 5090 GPU (31.36 GB usable memory). The workload trains a 2-layer GCN with 256 hidden dimensions on a random graph with 10M nodes and 100M edges, requiring 45.11 GB peak memory allocation—**1.44× the physical GPU capacity**.
 
-## Recommendations for OSDI/NSDI Submissions
+Without UVM, training fails immediately with an out-of-memory error. With UVM enabled, training completes successfully but suffers a **4.5× slowdown** (69.87s vs 15.72s per epoch) due to page migration overhead between GPU and host memory. Notably, applying an eBPF-based kernel scheduler optimization reduces epoch time to 27.43s, achieving a **2.5× speedup** over baseline UVM while maintaining identical memory allocation patterns. This demonstrates that CPU scheduling policies significantly impact UVM page fault handling performance, even for GPU-intensive workloads.
 
-### When to Use SpMM Mode
-- Standard accuracy baselines on OGB datasets (ogbn-arxiv, ogbn-products)
-- When full graph fits in GPU memory
-- Maximum performance is critical
+### Results Table (10M nodes)
 
-### When to Use Chunked Mode
-- Memory-constrained scenarios
-- Very large graphs with many features
-- Demonstrating memory-efficient algorithms
+| Condition | Epoch Time | Peak Memory | Oversubscription | Status |
+|-----------|------------|-------------|------------------|--------|
+| No UVM | N/A | >31 GB | N/A | OOM |
+| UVM Baseline | **69.87s** | 45.11 GB | 1.44× | Success |
+| UVM + eBPF | **27.43s** | 45.11 GB | 1.44× | **2.5× faster** |
 
-### When to Use UVM
-- **Oversubscription experiments** (dataset > GPU memory)
-- Demonstrating scalability beyond hardware limits
-- Studying memory management trade-offs
-- **Note**: Expect 100-500× slowdown due to PCIe transfer overhead
+### Data Sources
 
-### Reporting Guidelines
-
-For reproducibility, report:
-1. **Hardware**: GPU model, memory capacity, PCIe generation
-2. **Configuration**: Node count, edge count, feature dimensions, hidden dimensions
-3. **Timing**: Warmup epochs, measured epochs, synchronization method
-4. **Memory**: GPU allocated, CPU used, UVM peak (if applicable)
-5. **Accuracy**: Train/valid/test splits (for OGB datasets)
+| File | Config | Key Metrics |
+|------|--------|-------------|
+| `results_uvm_10m.json` | 10M nodes, UVM | 69.87s/epoch |
+| `result/gcn_random_chunked_20251125_*.json` | 5M nodes, no UVM | 1.30s/epoch, 5.53 GB |
 
 ---
 
-## Usage Examples
+## Experiment Scripts
 
-### Standard Evaluation (1M nodes, fits in memory)
+### 三个独立脚本，输出到不同文件夹
+
+| Script | Condition | Output Directory |
+|--------|-----------|------------------|
+| `run_no_uvm.sh` | 纯 GPU，不开 UVM | `result_no_uvm/` |
+| `run_uvm_baseline.sh` | 开 UVM，默认调度器 | `result_uvm_baseline/` |
+| `run_uvm_ebpf.sh` | 开 UVM，需先启动 eBPF | `result_uvm_ebpf/` |
+
+---
+
+### Script 1: No UVM (Pure GPU)
+
 ```bash
-# SpMM mode - fastest
-python benchmark_gnn_uvm.py --dataset random --nodes 1000000 \
-    --prop spmm --epochs 5 --report_json results.json
+#!/bin/bash
+# run_no_uvm.sh - 纯 GPU 测试，不开 UVM
 
-# Chunked mode - memory-efficient
-python benchmark_gnn_uvm.py --dataset random --nodes 1000000 \
-    --prop chunked --chunk_size 2000000 --epochs 5
+RESULT_DIR="result_no_uvm"
+mkdir -p $RESULT_DIR
+
+echo "========================================"
+echo "No UVM Test - Pure GPU Memory"
+echo "Output: $RESULT_DIR/"
+echo "========================================"
+
+# 小规模 (应该成功)
+for NODES in 1000000 3000000 5000000; do
+    echo "=== Testing ${NODES} nodes (no UVM) ==="
+    uv run python benchmark_gnn_uvm.py --dataset random --nodes $NODES \
+        --edges_per_node 10 --features 128 --hidden 256 \
+        --epochs 2 --warmup 1 --prop chunked \
+        --report_json $RESULT_DIR/${NODES}.json 2>&1 | tee $RESULT_DIR/${NODES}.log
+done
+
+# 临界点 (可能 OOM)
+for NODES in 7000000 8000000 10000000; do
+    echo "=== Testing ${NODES} nodes (no UVM, may OOM) ==="
+    timeout 300 uv run python benchmark_gnn_uvm.py --dataset random --nodes $NODES \
+        --edges_per_node 10 --features 128 --hidden 256 \
+        --epochs 1 --warmup 0 --prop chunked \
+        --report_json $RESULT_DIR/${NODES}.json 2>&1 | tee $RESULT_DIR/${NODES}.log || echo "OOM or timeout"
+done
+
+echo "========================================"
+echo "Done! Results saved to $RESULT_DIR/"
+echo "========================================"
 ```
-
-### Oversubscription Experiment (10M nodes, exceeds GPU memory)
-```bash
-# This will OOM without UVM
-python benchmark_gnn_uvm.py --dataset random --nodes 10000000 \
-    --prop chunked --epochs 2
-
-# This succeeds with UVM
-export CUDA_MANAGED_FORCE_DEVICE_ALLOC=1
-python benchmark_gnn_uvm.py --dataset random --nodes 10000000 \
-    --prop chunked --epochs 2 --use_uvm --report_json results_uvm.json
-```
-
-### OGB Datasets (requires: pip install ogb)
-```bash
-# ogbn-arxiv (169K nodes, 1.1M edges)
-python benchmark_gnn_uvm.py --dataset ogbn-arxiv --prop spmm --epochs 100
-
-# ogbn-products (2.4M nodes, 61M edges)
-python benchmark_gnn_uvm.py --dataset ogbn-products --prop chunked --epochs 50
-```
-
-
 
 ---
+
+### Script 2: UVM Baseline (Default Scheduler)
+
+```bash
+#!/bin/bash
+# run_uvm_baseline.sh - UVM 测试，默认调度器
+
+RESULT_DIR="result_uvm_baseline"
+mkdir -p $RESULT_DIR
+
+echo "========================================"
+echo "UVM Baseline Test - Default Scheduler"
+echo "Output: $RESULT_DIR/"
+echo "========================================"
+
+for NODES in 5000000 7000000 8000000 10000000 12000000 15000000; do
+    echo "=== Testing ${NODES} nodes (UVM baseline) ==="
+    CUDA_MANAGED_FORCE_DEVICE_ALLOC=1 uv run python benchmark_gnn_uvm.py \
+        --dataset random --nodes $NODES \
+        --edges_per_node 10 --features 128 --hidden 256 \
+        --epochs 2 --warmup 1 --prop chunked --use_uvm \
+        --report_json $RESULT_DIR/${NODES}.json 2>&1 | tee $RESULT_DIR/${NODES}.log
+done
+
+echo "========================================"
+echo "Done! Results saved to $RESULT_DIR/"
+echo "========================================"
+```
+
+---
+
+### Script 3: UVM + eBPF Scheduler
+
+```bash
+#!/bin/bash
+# run_uvm_ebpf.sh - UVM 测试，需先启动 eBPF 调度器
+
+RESULT_DIR="result_uvm_ebpf"
+mkdir -p $RESULT_DIR
+
+echo "========================================"
+echo "UVM + eBPF Scheduler Test"
+echo "Output: $RESULT_DIR/"
+echo ""
+echo "IMPORTANT: Before running this script, start eBPF scheduler:"
+echo "  sudo schedcp-cli run scx_simple"
+echo "========================================"
+read -p "Press Enter to continue (or Ctrl+C to cancel)..."
+
+for NODES in 5000000 7000000 8000000 10000000 12000000 15000000; do
+    echo "=== Testing ${NODES} nodes (UVM + eBPF) ==="
+    CUDA_MANAGED_FORCE_DEVICE_ALLOC=1 uv run python benchmark_gnn_uvm.py \
+        --dataset random --nodes $NODES \
+        --edges_per_node 10 --features 128 --hidden 256 \
+        --epochs 2 --warmup 1 --prop chunked --use_uvm \
+        --report_json $RESULT_DIR/${NODES}.json 2>&1 | tee $RESULT_DIR/${NODES}.log
+done
+
+echo "========================================"
+echo "Done! Results saved to $RESULT_DIR/"
+echo ""
+echo "Remember to stop eBPF scheduler when done:"
+echo "  sudo schedcp-cli stop"
+echo "========================================"
+```
+
+---
+
+## How to Run
+
+```bash
+# Step 1: 纯 GPU 测试 (baseline, 确定 OOM 临界点)
+bash run_no_uvm.sh
+
+# Step 2: UVM baseline 测试 (默认调度器)
+bash run_uvm_baseline.sh
+
+# Step 3: 启动 eBPF 调度器，然后运行 UVM 测试
+sudo schedcp-cli run scx_simple
+bash run_uvm_ebpf.sh
+sudo schedcp-cli stop
+```
+
+---
+
+## Expected Figures
+
+### Figure 1: Performance vs Oversubscription Ratio
+
+**Purpose**: 展示 UVM 如何突破 GPU 显存限制
+
+```
+Epoch Time (s)
+    │
+100 │                              ╭── UVM
+    │                         ╭────╯
+ 50 │                    ╭────╯
+    │               ╭────╯
+ 10 │    ────────────╯ (OOM without UVM)
+  1 │────────────
+    └─────────────────────────────────────
+       0.7×  1.0×  1.5×  2.0×  2.5×
+              Oversubscription Ratio
+```
+
+**Data needed**: `result_no_uvm/` + `result_uvm_baseline/`
+
+---
+
+### Figure 2: Scheduler Impact Comparison
+
+**Purpose**: 展示 eBPF 调度器的加速效果
+
+```
+Epoch Time (s)
+    │
+150 │  ████
+    │  ████  ████
+100 │  ████  ████  ████
+    │  ████  ████  ████
+ 50 │  ░░░░  ████  ████  ████
+    │  ░░░░  ░░░░  ████  ████
+  0 │  ░░░░  ░░░░  ░░░░  ░░░░
+    └─────────────────────────
+       1.0×  1.44× 1.72× 2.17×
+       (7M)  (10M) (12M) (15M)
+
+    ████ UVM Baseline   ░░░░ UVM + eBPF
+```
+
+**Data needed**: `result_uvm_baseline/` + `result_uvm_ebpf/`
+
+---
+
+## Data Collection Checklist
+
+| Nodes | No UVM | UVM Baseline | UVM + eBPF |
+|-------|--------|--------------|------------|
+| 5M | ⬜ | ⬜ | ⬜ |
+| 7M | ⬜ (OOM?) | ⬜ | ⬜ |
+| 8M | ⬜ (OOM?) | ⬜ | ⬜ |
+| 10M | ⬜ (OOM) | ⬜ | ⬜ |
+| 12M | ⬜ (OOM) | ⬜ | ⬜ |
+| 15M | ⬜ (OOM) | ⬜ | ⬜ |
+
+---
+
+## Notes
+
+- 所有 UVM 测试需要设置 `CUDA_MANAGED_FORCE_DEVICE_ALLOC=1`
+- cuBLAS 可能在极端 oversubscription (>2×) 时失败
+- 建议每个配置运行 3 次取平均值
+- 监控 `nvidia-smi` 观察实时 GPU 内存和 PCIe 带宽

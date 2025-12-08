@@ -9,24 +9,24 @@
   "num_features": 128,
   "num_classes": 10,
   "num_edges": 63000000,
-  "avg_epoch_time_s": 0.6761130094528198,
-  "median_epoch_time_s": 0.6761879920959473,
-  "total_time_s": 1.3522260189056396,
+  "avg_epoch_time_s": 1.0440932512283325,
+  "median_epoch_time_s": 1.0447559356689453,
+  "total_time_s": 2.088186502456665,
   "epoch_times_s": [
-    0.6760380268096924,
-    0.6761879920959473
+    1.0447559356689453,
+    1.0434305667877197
   ],
   "accuracy": {
     "train": 0.10067
   },
   "memory": {
-    "gpu_allocated_GB": 3.322839552,
-    "cpu_used_GB": 1.636610048,
-    "total_GB": 4.9594496
+    "gpu_allocated_GB": 3.32165744,
+    "cpu_used_GB": 1.616863232,
+    "total_GB": 4.938520672
   },
   "use_uvm": false,
   "seed": 2025,
   "gpu_name": "NVIDIA GeForce RTX 5090",
   "gpu_memory_GB": 33.669316608,
-  "timestamp": "2025-12-08T13:10:48.326813"
+  "timestamp": "2025-12-08T15:20:01.717397"
 }

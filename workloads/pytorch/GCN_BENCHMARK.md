@@ -92,7 +92,7 @@ for NODES in 1000000 3000000 5000000; do
     echo "=== Testing ${NODES} nodes (no UVM) ==="
     uv run python benchmark_gnn_uvm.py --dataset random --nodes $NODES \
         --edges_per_node 10 --features 128 --hidden 256 \
-        --epochs 2 --warmup 1 --prop chunked \
+        --epochs 2 --warmup 1 --prop chunked  --use_gpu_allocator \
         --report_json $RESULT_DIR/${NODES}.json 2>&1 | tee $RESULT_DIR/${NODES}.log
 done
 
@@ -101,7 +101,7 @@ for NODES in 7000000 8000000 10000000; do
     echo "=== Testing ${NODES} nodes (no UVM, may OOM) ==="
     timeout 300 uv run python benchmark_gnn_uvm.py --dataset random --nodes $NODES \
         --edges_per_node 10 --features 128 --hidden 256 \
-        --epochs 1 --warmup 0 --prop chunked \
+        --epochs 1 --warmup 0 --prop chunked  --use_gpu_allocator \
         --report_json $RESULT_DIR/${NODES}.json 2>&1 | tee $RESULT_DIR/${NODES}.log || echo "OOM or timeout"
 done
 

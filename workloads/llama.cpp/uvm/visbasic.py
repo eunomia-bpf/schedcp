@@ -2,21 +2,23 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+plt.rcParams.update({'font.size': 28})
+
 configs = [
-    "UVM only",
-    "UVM+userspace policy hint",
     "ncmoe=64",
     "ncmoe=32",
-    "UVM + eBPF always max prefetch + fifo",
+    "UVM only",
+    "UVM + user hint",
+    "UVM + eBPF",
 ]
 
-pp512 = [238.48, 144.00, 245.63, 260.14, 229.67]
-tg128 = [7.72,   49.31, 16.34, 18.18, 86.89]
+pp512 = [245.63, 260.14, 238.48, 144.00, 229.67]
+tg128 = [16.34, 18.18, 7.72, 49.31, 86.89]
 
 x = np.arange(len(configs))
 width = 0.35
 
-fig, ax1 = plt.subplots(figsize=(9, 4))
+fig, ax1 = plt.subplots(figsize=(14, 8))
 
 # left axis: pp512 (blue)
 rects1 = ax1.bar(
@@ -41,8 +43,9 @@ fig.suptitle("gpt-oss-120B MXFP4 MoE - throughput vs config")
 
 handles = [rects1, rects2]
 labels = ["pp512 tokens/s", "tg128 tokens/s"]
-ax1.legend(handles, labels, loc="upper left")
+fig.legend(handles, labels, loc="lower center", ncol=2, bbox_to_anchor=(0.5, -0.02))
 
 fig.tight_layout()
-fig.savefig("llama_uvm_combined_color.png", dpi=150)
-print("saved to llama_uvm_combined_color.png")
+fig.subplots_adjust(bottom=0.25)
+fig.savefig("llama_uvm_combined_color.pdf")
+print("saved to llama_uvm_combined_color.pdf")

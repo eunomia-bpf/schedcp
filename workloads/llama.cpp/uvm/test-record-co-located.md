@@ -1,4 +1,49 @@
-# Test 
+# Test
+
+## 核心 Claim（BPF vs Baseline UVM，Co-located 场景）
+
+### 实验 Setup
+
+| 配置 | 详情 |
+|------|------|
+| **GPU** | NVIDIA RTX 5090 (32GB) |
+| **CPU** | Intel Core Ultra 9 285K |
+| **Memory** | 128GB DDR5 |
+| **LC 负载** | llama.cpp + gpt-oss-20b, UVM enabled, context 65536 |
+| **BE 负载** | PyTorch GNN Training, 8M nodes, UVM enabled (peak 36GB) |
+| **Benchmark** | ShareGPT dataset, 100 prompts, request rate 0.2 RPS |
+
+### LLM 推理服务（延迟敏感型负载）改进
+
+| 指标 | Single | Baseline UVM | BPF 优化后 | UVM/Single | BPF/Single | BPF 改进 |
+|------|--------|--------------|------------|------------|------------|----------|
+| **TPOT Mean** | 3.67ms | 19.73ms | 10.86ms | 5.38× | **2.96×** | **45.0%** |
+| **TPOT P99** | 3.91ms | 56.06ms | 33.37ms | 14.34× | **8.53×** | **40.5%** |
+| TTFT Mean | 63.70ms | 428.24ms | 341.48ms | 6.72× | 5.36× | 20.3% |
+| TTFT P99 | 98.48ms | 1391.61ms | 1202.97ms | 14.13× | 12.22× | 13.6% |
+
+### GNN 训练（尽力而为型负载）改进
+
+| 指标 | Single | Baseline UVM | BPF 优化后 | UVM/Single | BPF/Single | BPF 改进 |
+|------|--------|--------------|------------|------------|------------|----------|
+| 平均 Epoch 时间 | 8.98s | 23.23s | 16.72s | 2.59× | **1.86×** | **28.0%** |
+
+### OSDI 可 Claim 的要点
+
+1. **Token 生成延迟降低 45%**：BPF 调度策略将 TPOT 从 19.73ms 降至 10.86ms（1.82× 加速）
+   - 距离 solo 性能：BPF 后仅为 single baseline 的 **2.96×**（vs UVM 的 5.38×）
+
+2. **尾延迟改善 40%**：P99 TPOT 从 56.06ms 降至 33.37ms
+   - 距离 solo 性能：从 14.34× 降至 **8.53×**
+
+3. **双赢结果**：BPF 策略同时改善 LC（延迟降低 45%）和 BE（训练加速 28%）
+   - GNN 距离 solo：从 2.59× 降至 **1.86×**（接近理想的 2× 公平共享）
+
+4. **整体效率提升**：BE 训练时间从 580s 缩短至 418s，同时 LC 延迟大幅降低
+
+![Co-located Results](fig_colocated_results.png)
+
+---
 
 ## Single llama.cpp baseline
 

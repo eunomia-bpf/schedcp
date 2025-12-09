@@ -548,8 +548,17 @@ def main():
                         help='Enable custom GPU allocator (cudaMalloc, for comparison)')
     parser.add_argument('--report_json', type=str, default='',
                         help='Path to save JSON report')
+    parser.add_argument('--wait-for-bpf', action='store_true',
+                        help='Print PID and wait for user confirmation before running')
 
     args = parser.parse_args()
+
+    # =============================================================================
+    # Wait for BPF (if requested)
+    # =============================================================================
+    if args.wait_for_bpf:
+        print(f"PID: {os.getpid()}")
+        input("Press Enter to continue after attaching BPF...")
 
     # =============================================================================
     # Step 0: Enable custom allocator (must be before any CUDA operations)

@@ -33,9 +33,150 @@ P99 ITL (ms):                            3.93
 
 ## Single GCN training
 
+time CUDA_MANAGED_FORCE_DEVICE_ALLOC=1 uv run python benchmark_gnn_uvm.py \
+        --dataset random --nodes 8000000 \
+        --edges_per_node 10 --features 128 --hidden 256 \
+        --epochs 50 --warmup 1 --prop chunked --use_uvm 
 
+[UVM] Alloc #19057: 2.05 GB (total: 29.31 GB, peak: 36.09 GB)
+[UVM] Alloc #19058: 2.05 GB (total: 31.35 GB, peak: 36.09 GB)
+[UVM] Alloc #19059: 2.05 GB (total: 29.31 GB, peak: 36.09 GB)
+======================================================================
+Results Summary
+======================================================================
+Avg epoch time: 8.975s
+Median epoch time: 9.023s
+Total training time: 17.95s
+
+Accuracy:
+  train: 0.1001
+
+UVM Statistics:
+  Peak allocated: 36.09 GB
+  Allocations: 3119
+  Frees: 2574
+======================================================================
 
 ## Co-located
+
+### baseline UVM
+
+~/workspace/gpu/schedcp/workloads/llama.cpp$ uv run vllm bench serve --model  Qwen/Qwen3-30B-A3B-FP8 --dataset-name sharegpt --num-prompts  100 --dataset-path /home/yunwei37/workspace/gpu/schedcp/workloads/vllm/datasets/ShareGPT_V3_unfiltered_cleaned_split.json  --base-url http://127.0.0.1:8013  --max-concurrency=1 --request-rate 0.2
+
+============ Serving Benchmark Result ============
+Successful requests:                     100       
+Maximum request concurrency:             1         
+Request rate configured (RPS):           0.20      
+Benchmark duration (s):                  563.29    
+Total input tokens:                      23260     
+Total generated tokens:                  22380     
+Request throughput (req/s):              0.18      
+Output token throughput (tok/s):         39.73     
+Peak output token throughput (tok/s):    144.00    
+Peak concurrent requests:                3.00      
+Total Token throughput (tok/s):          81.02     
+---------------Time to First Token----------------
+Mean TTFT (ms):                          428.24    
+Median TTFT (ms):                        323.23    
+P99 TTFT (ms):                           1391.61   
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          19.73     
+Median TPOT (ms):                        16.97     
+P99 TPOT (ms):                           56.06     
+---------------Inter-token Latency----------------
+Mean ITL (ms):                           17.79     
+Median ITL (ms):                         8.42      
+P99 ITL (ms):                            116.63    
+==================================================
+
+
+time CUDA_MANAGED_FORCE_DEVICE_ALLOC=1 uv run python benchmark_gnn_uvm.py \
+        --dataset random --nodes 8000000 \
+        --edges_per_node 10 --features 128 --hidden 256 \
+        --epochs 25 --warmup 1 --prop chunked --use_uvm \
+        --report_json multi/100.json
+
+[UVM] Alloc #19057: 2.05 GB (total: 29.31 GB, peak: 36.09 GB)
+[UVM] Alloc #19058: 2.05 GB (total: 31.35 GB, peak: 36.09 GB)
+[UVM] Alloc #19059: 2.05 GB (total: 29.31 GB, peak: 36.09 GB)
+======================================================================
+Results Summary
+======================================================================
+Avg epoch time: 23.230s
+Median epoch time: 21.657s
+Total training time: 580.75s
+
+Accuracy:
+  train: 0.1006
+
+UVM Statistics:
+  Peak allocated: 36.09 GB
+  Allocations: 23934
+  Frees: 19433
+======================================================================
+
+
+### UVM with BPF
+
+
+~/workspace/gpu/schedcp/workloads/llama.cpp$ uv run vllm bench serve --model  Qwen/Qwen3-30B-A3B-FP8 --dataset-name sharegpt --num-prompts  100 --dataset-path /home/yunwei37/workspace/gpu/schedcp/workloads/vllm/datasets/ShareGPT_V3_unfiltered_cleaned_split.json  --base-url http://127.0.0.1:8013  --max-concurrency=1 --request-rate 0.2
+
+.
+Traffic request rate: 0.2
+Burstiness factor: 1.0 (Poisson process)
+Maximum request concurrency: 1
+100%|█████████| 100/100 [08:22<00:00,  5.02s/it]
+tip: install termplotlib and gnuplot to plot the metrics
+============ Serving Benchmark Result ============
+Successful requests:                     100       
+Maximum request concurrency:             1         
+Request rate configured (RPS):           0.20      
+Benchmark duration (s):                  502.38    
+Total input tokens:                      23260     
+Total generated tokens:                  22380     
+Request throughput (req/s):              0.20      
+Output token throughput (tok/s):         44.55     
+Peak output token throughput (tok/s):    270.00    
+Peak concurrent requests:                4.00      
+Total Token throughput (tok/s):          90.85     
+---------------Time to First Token----------------
+Mean TTFT (ms):                          341.48    
+Median TTFT (ms):                        209.25    
+P99 TTFT (ms):                           1202.97   
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          10.86     
+Median TPOT (ms):                        9.72      
+P99 TPOT (ms):                           33.37     
+---------------Inter-token Latency----------------
+Mean ITL (ms):                           9.66      
+Median ITL (ms):                         4.80      
+P99 ITL (ms):                            73.53     
+==================================================
+
+time CUDA_MANAGED_FORCE_DEVICE_ALLOC=1 uv run python benchmark_gnn_uvm.py         --dataset random --nodes 8000000         --edges_per_node 10 --features 128 --hidden 256         --epochs 25 --warmup 1 --prop chunked --use_uvm  --wait-for-bpf 
+
+[UVM] Alloc #19057: 2.05 GB (total: 29.31 GB, peak: 36.09 GB)
+[UVM] Alloc #19058: 2.05 GB (total: 31.35 GB, peak: 36.09 GB)
+[UVM] Alloc #19059: 2.05 GB (total: 29.31 GB, peak: 36.09 GB)
+======================================================================
+Results Summary
+======================================================================
+Avg epoch time: 16.718s
+Median epoch time: 15.527s
+Total training time: 417.95s
+
+Accuracy:
+  train: 0.1006
+
+UVM Statistics:
+  Peak allocated: 36.09 GB
+  Allocations: 23934
+  Frees: 19433
+======================================================================
+
+## bpf status
+
+
 
 ---
 

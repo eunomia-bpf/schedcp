@@ -334,3 +334,11 @@ Our testing methodology:
 - **llama.cpp**: Uses UVM for large language model inference on GH200 systems ([Issue #5026](https://github.com/ggml-org/llama.cpp/issues/5026))
 - **PyTorch Request**: Discussion about native UVM support ([Issue #124296](https://github.com/pytorch/pytorch/issues/124296))
 - **TorchRec**: Feature request for UVM embedding support ([Issue #125](https://github.com/meta-pytorch/torchrec/issues/125))
+
+##
+
+time CUDA_MANAGED_FORCE_DEVICE_ALLOC=1 uv run python benchmark_gnn_uvm.py \
+        --dataset random --nodes 8000000 \
+        --edges_per_node 10 --features 128 --hidden 256 \
+        --epochs 50 --warmup 1 --prop chunked --use_uvm 
+        --report_json multi/100.json

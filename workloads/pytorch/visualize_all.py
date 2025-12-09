@@ -23,10 +23,10 @@ RESULT_DIRS = {
     "No UVM (Baseline)": BASE_DIR / "without-user-prefetch" / "result_no_uvm1",
     # Without prefetch
     "UVM (no prefetch)": BASE_DIR / "without-user-prefetch" / "result_uvm_baseline1",
-    "UVM (no prefetch) + eBPF": BASE_DIR / "without-user-prefetch" / "result_uvm_ebpf1",
+    "UVM (no prefetch) eBPF": BASE_DIR / "without-user-prefetch" / "result_uvm_ebpf1",
     # With prefetch
     "UVM (prefetch)": BASE_DIR / "with-user-prefetch" / "result_uvm_baseline",
-    "UVM (prefetch) + eBPF": BASE_DIR / "with-user-prefetch" / "result_uvm_ebpf",
+    "UVM (prefetch) eBPF": BASE_DIR / "with-user-prefetch" / "result_uvm_ebpf",
 }
 
 
@@ -74,13 +74,13 @@ def main():
         "UVM (no prefetch)": {
             "color": "#e74c3c", "marker": "s", "linestyle": "-", "linewidth": 3.5
         },
-        "UVM (no prefetch) + eBPF": {
+        "UVM (no prefetch) eBPF": {
             "color": "#e74c3c", "marker": "s", "linestyle": "--", "linewidth": 3.5
         },
         "UVM (prefetch)": {
             "color": "#3498db", "marker": "^", "linestyle": "-", "linewidth": 3.5
         },
-        "UVM (prefetch) + eBPF": {
+        "UVM (prefetch) eBPF": {
             "color": "#3498db", "marker": "^", "linestyle": "--", "linewidth": 3.5
         },
     }
@@ -89,9 +89,9 @@ def main():
     plot_order = [
         "No UVM (Baseline)",
         "UVM (no prefetch)",
-        "UVM (no prefetch) + eBPF",
+        "UVM (no prefetch) eBPF",
         "UVM (prefetch)",
-        "UVM (prefetch) + eBPF",
+        "UVM (prefetch) eBPF",
     ]
 
     # Plot each condition
@@ -175,7 +175,7 @@ def main():
             row += "-".ljust(12)
 
         # UVM no prefetch + eBPF
-        uvm_nopf_ebpf = all_results.get("UVM (no prefetch) + eBPF", {})
+        uvm_nopf_ebpf = all_results.get("UVM (no prefetch) eBPF", {})
         if n in uvm_nopf_ebpf:
             t = uvm_nopf_ebpf[n]["avg_epoch_time_s"]
             row += f"{t:.2f}s".ljust(12)
@@ -191,7 +191,7 @@ def main():
             row += "-".ljust(12)
 
         # UVM prefetch + eBPF
-        uvm_pf_ebpf = all_results.get("UVM (prefetch) + eBPF", {})
+        uvm_pf_ebpf = all_results.get("UVM (prefetch) eBPF", {})
         if n in uvm_pf_ebpf:
             t = uvm_pf_ebpf[n]["avg_epoch_time_s"]
             row += f"{t:.2f}s".ljust(14)
@@ -227,9 +227,9 @@ def main():
 
     for n in sorted(all_nodes):
         uvm_nopf = all_results.get("UVM (no prefetch)", {})
-        uvm_nopf_ebpf = all_results.get("UVM (no prefetch) + eBPF", {})
+        uvm_nopf_ebpf = all_results.get("UVM (no prefetch) eBPF", {})
         uvm_pf = all_results.get("UVM (prefetch)", {})
-        uvm_pf_ebpf = all_results.get("UVM (prefetch) + eBPF", {})
+        uvm_pf_ebpf = all_results.get("UVM (prefetch) eBPF", {})
 
         if n in uvm_nopf and n in uvm_pf:
             prefetch_speedups.append(uvm_nopf[n]["avg_epoch_time_s"] / uvm_pf[n]["avg_epoch_time_s"])

@@ -28,7 +28,7 @@ def parse_filename(filename):
         dataset = "Unknown"
 
     if "prefetch_adaptive" in name:
-        config = "UVM+BPF Prefetch"
+        config = "UVM eBPF"
     elif "uvm_baseline" in name:
         config = "UVM Baseline"
     elif "cpu" in name:
@@ -55,7 +55,7 @@ config_colors = {
     "CPU": "tab:blue",
     "GPU": "tab:green",
     "UVM Baseline": "tab:orange",
-    "UVM+BPF Prefetch": "tab:red",
+    "UVM eBPF Prefetch": "tab:red",
 }
 
 dataset_colors = {
@@ -89,7 +89,7 @@ ax1.tick_params(axis='both', labelsize=14)
 
 # ==================== 右图: Search Latency 改进 (折线图) ====================
 uvm_datasets = [ds for ds in sorted(data_by_dataset.keys())
-                if "UVM Baseline" in data_by_dataset[ds] and "UVM+BPF Prefetch" in data_by_dataset[ds]]
+                if "UVM Baseline" in data_by_dataset[ds] and "UVM eBPF" in data_by_dataset[ds]]
 
 all_nprobes = sorted(set(
     s["nprobe"]
@@ -99,7 +99,7 @@ all_nprobes = sorted(set(
 
 for ds in uvm_datasets:
     base_search = {s["nprobe"]: s for s in data_by_dataset[ds]["UVM Baseline"]["search"]}
-    pref_search = {s["nprobe"]: s for s in data_by_dataset[ds]["UVM+BPF Prefetch"]["search"]}
+    pref_search = {s["nprobe"]: s for s in data_by_dataset[ds]["UVM eBPF"]["search"]}
 
     nprobes = []
     normalized_latencies = []
@@ -148,7 +148,7 @@ legend_elements = [
     Line2D([0], [0], color='tab:blue', marker='o', markersize=8, linewidth=2, label='CPU'),
     Line2D([0], [0], color='tab:green', marker='o', markersize=8, linewidth=2, label='GPU'),
     Line2D([0], [0], color='tab:orange', marker='o', markersize=8, linewidth=2, label='UVM Baseline'),
-    Line2D([0], [0], color='tab:red', marker='o', markersize=8, linewidth=2, label='UVM+BPF Prefetch'),
+    Line2D([0], [0], color='tab:red', marker='o', markersize=8, linewidth=2, label='UVM eBPF'),
     # 数据集（右图）
     Line2D([0], [0], color='tab:blue', marker='o', markersize=10, linewidth=2, linestyle='-', label='SIFT50M (right)'),
     Line2D([0], [0], color='tab:red', marker='s', markersize=10, linewidth=2, linestyle='-', label='SIFT100M (right)'),
@@ -182,7 +182,7 @@ print("-" * 60)
 
 for ds in uvm_datasets:
     base_search = {s["nprobe"]: s for s in data_by_dataset[ds]["UVM Baseline"]["search"]}
-    pref_search = {s["nprobe"]: s for s in data_by_dataset[ds]["UVM+BPF Prefetch"]["search"]}
+    pref_search = {s["nprobe"]: s for s in data_by_dataset[ds]["UVM eBPF"]["search"]}
 
     for nprobe in all_nprobes:
         if nprobe in base_search and nprobe in pref_search:

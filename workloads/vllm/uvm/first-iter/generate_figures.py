@@ -13,7 +13,7 @@ data = {
     "configurations": [
         "CPU Offload\n(8GB)",
         "UVM\nBaseline",
-        "UVM +\nPrefetch",
+        "UVM\neBPF",
         "LMCache"
     ],
     # Time to First Token (ms)

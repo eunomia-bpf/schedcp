@@ -16,35 +16,28 @@ pp512 = [245.63, 260.14, 238.48, 144.00, 229.67]
 tg128 = [16.34, 18.18, 7.72, 49.31, 86.89]
 
 x = np.arange(len(configs))
-width = 0.35
+width = 0.6
 
-fig, ax1 = plt.subplots(figsize=(14, 8))
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 7))
 
-# left axis: pp512 (blue)
-rects1 = ax1.bar(
-    x - width/2, pp512, width,
-    label="prefill tokens/s",
-    color="tab:blue",
-)
-ax1.set_ylabel("tokens/s (pp512)")
+# Left plot: Prefill throughput (pp512)
+rects1 = ax1.bar(x, pp512, width, color="tab:blue", alpha=0.8)
+ax1.set_ylabel("tokens/s", fontsize=28)
+ax1.set_title("Prefill Throughput (pp512)", fontsize=28)
 ax1.set_xticks(x)
-ax1.set_xticklabels(configs, rotation=20, ha="right")
+ax1.set_xticklabels(configs, rotation=20, ha="right", fontsize=22)
+ax1.tick_params(axis='y', labelsize=24)
+ax1.grid(axis='y', alpha=0.3)
 
-# right axis: tg128 (orange)
-ax2 = ax1.twinx()
-rects2 = ax2.bar(
-    x + width/2, tg128, width,
-    label="decoding tokens/s",
-    color="tab:orange",
-)
-ax2.set_ylabel("tokens/s (tg128)")
-
-
-handles = [rects1, rects2]
-labels = ["pp512 tokens/s", "tg128 tokens/s"]
-fig.legend(handles, labels, loc="lower center", ncol=2, bbox_to_anchor=(0.5, -0.02))
+# Right plot: Decode throughput (tg128)
+rects2 = ax2.bar(x, tg128, width, color="tab:orange", alpha=0.8)
+ax2.set_ylabel("tokens/s", fontsize=28)
+ax2.set_title("Decode Throughput (tg128)", fontsize=28)
+ax2.set_xticks(x)
+ax2.set_xticklabels(configs, rotation=20, ha="right", fontsize=22)
+ax2.tick_params(axis='y', labelsize=24)
+ax2.grid(axis='y', alpha=0.3)
 
 fig.tight_layout()
-fig.subplots_adjust(bottom=0.25)
 fig.savefig("llama_uvm_combined_color.pdf")
 print("saved to llama_uvm_combined_color.pdf")

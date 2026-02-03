@@ -4,7 +4,7 @@
 
 SchedCP is an `experimental` project that enables AI optimization of Linux kernel schedulers using the sched-ext framework. It provides e2e automatic scheduler selection/synthesis, workload profiling, and performance optimization without any human intervention or guidance.
 
-Paper: [SchedCP: Towards Agentic OS](https://arxiv.org/abs/2509.18256)
+Paper: [SchedCP: Towards Agentic OS](https://arxiv.org/abs/2509.01245)
 
 *The future is not just about letting AI write code for you; the AI agent should act as your system administrator, able to optimize anything for you automatically, without requiring any manual intervention!*
 

@@ -138,7 +138,7 @@ export SCHEDCP_SUDO_PASSWORD="your_password"
 ./mcp/target/release/schedcp-cli monitor
 ```
 
-For detailed usage instructions, see [USAGE_GUIDE.md](USAGE_GUIDE.md).
+For detailed usage instructions, see [USAGE_GUIDE.md](document/USAGE_GUIDE.md).
 
 ## Artifact from Paper
 

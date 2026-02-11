@@ -54,9 +54,9 @@ Each component is relatively independent but they work together to provide end-t
 ### Documentation Files
 
 - **`README.md`**: Main project introduction and quick start
-- **`USAGE_GUIDE.md`**: Comprehensive guide on using schedulers
-- **`PROJECT_STRUCTURE.md`**: This file - codebase organization
-- **`AI_AGENTS.md`**: AI agent implementation and architecture
+- **`document/USAGE_GUIDE.md`**: Comprehensive guide on using schedulers
+- **`document/PROJECT_STRUCTURE.md`**: This file - codebase organization
+- **`document/AI_AGENTS.md`**: AI agent implementation and architecture
 - **`CLAUDE.md`**: Instructions for Claude AI when working with code
 - **`LICENSE`**: Project license information
 

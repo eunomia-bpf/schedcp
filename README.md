@@ -77,7 +77,35 @@ cd autotune && cargo build --release && cd ..
 cd mcp && cargo build --release && cd ..
 ```
 
-## Usage
+## Documentation
+
+### User Guides
+
+- **[USAGE_GUIDE.md](document/USAGE_GUIDE.md)** - Complete guide on how to use schedulers
+  - Installation and setup
+  - Using schedulers with CLI, MCP server, and autotune
+  - Understanding scheduler selection
+  - Troubleshooting
+
+- **[PROJECT_STRUCTURE.md](document/PROJECT_STRUCTURE.md)** - Detailed project organization
+  - Component overview and responsibilities
+  - Directory structure and file locations
+  - Data flow and integration points
+  - Build system architecture
+
+- **[AI_AGENTS.md](document/AI_AGENTS.md)** - AI agent implementation
+  - How observation, planning, execution, and learning agents work
+  - MCP tools and agent capabilities
+  - Example optimization workflows
+  - Integration with Claude and other AI systems
+
+### Design Documents
+
+- **[sched-agent-design.md](document/sched-agent-design.md)** - Multi-agent framework design
+- **[schedcp-design.md](document/schedcp-design.md)** - System control plane architecture
+- **Research Paper**: [SchedCP: Towards Agentic OS](https://arxiv.org/abs/2509.01245)
+
+## Quick Start
 
 **You should run the claude-code on project root directory.**
 
@@ -106,9 +134,11 @@ export SCHEDCP_SUDO_PASSWORD="your_password"
 # Run a scheduler
 ./mcp/target/release/schedcp-cli run scx_rusty --sudo
 
-# Check status
-./mcp/target/release/schedcp-cli status
+# Monitor system metrics
+./mcp/target/release/schedcp-cli monitor
 ```
+
+For detailed usage instructions, see [USAGE_GUIDE.md](document/USAGE_GUIDE.md).
 
 ## Artifact from Paper
 
